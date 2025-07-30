@@ -1,0 +1,34 @@
+# FootyData_v2 Configuration
+
+api:
+  base_url: "https://fbrapi.com"
+  rate_limit_delay: 3  # seconds between requests
+  timeout: 30  # seconds
+
+database:
+  staging_schema: "staging"
+  final_schema: "football"
+  
+# Target leagues for initial data collection
+leagues:
+  - name: "Premier League"
+    country_code: "ENG"
+    league_id: "9"
+  - name: "La Liga"
+    country_code: "ESP" 
+    league_id: "12"
+  - name: "Bundesliga"
+    country_code: "GER"
+    league_id: "20"
+  - name: "Serie A"
+    country_code: "ITA"
+    league_id: "11"
+  - name: "Ligue 1"
+    country_code: "FRA"
+    league_id: "13"
+
+# Seasons to collect data for
+seasons:
+  - "2023-2024"
+  - "2022-2023"
+  - "2021-2022" 
