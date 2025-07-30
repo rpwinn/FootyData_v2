@@ -8,8 +8,9 @@ import requests
 import time
 import yaml
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
+from .endpoint_config import get_endpoint_config, format_api_call
 
 load_dotenv()
 
@@ -78,24 +79,51 @@ class FBRClient:
         params = {"league_id": league_id}
         return self._make_request("league-seasons", params)
     
-    def get_league_standings(self, league_id: str, season_id: str) -> Dict[str, Any]:
-        """Get standings for a specific league and season"""
+    def get_league_standings(self, league_id: int, season_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get league standings for a specific league and optionally season"""
+        params = {"league_id": league_id}
+        if season_id:
+            params["season_id"] = season_id
+        return self._make_request("league-standings", params)
+    
+    def get_league_standings_alt(self, league_id: str, season_id: str) -> Dict[str, Any]:
+        """Alternative league standings endpoint"""
+        params = {
+            "league_id": league_id,
+            "season_id": season_id
+        }
+        return self._make_request("standings", params)
+    
+    def get_league_standings_alt2(self, league_id: str, season_id: str) -> Dict[str, Any]:
+        """Alternative league standings endpoint"""
         params = {
             "league_id": league_id,
             "season_id": season_id
         }
         return self._make_request("league-standings", params)
     
-    def get_teams(self, league_id: str, season_id: str) -> Dict[str, Any]:
-        """Get teams for a specific league and season"""
+    def get_teams(self, team_id: str, season_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get team data for a specific team and optionally season"""
+        params = {"team_id": team_id}
+        if season_id:
+            params["season_id"] = season_id
+        return self._make_request("teams", params)
+    
+    def get_teams_by_league(self, league_id: str, season_id: str) -> Dict[str, Any]:
+        """Get teams for a specific league and season (if this endpoint exists)"""
         params = {
             "league_id": league_id,
             "season_id": season_id
         }
         return self._make_request("teams", params)
     
-    def get_players(self, team_id: str, league_id: str, season_id: str) -> Dict[str, Any]:
-        """Get players for a specific team, league and season"""
+    def get_players(self, player_id: str) -> Dict[str, Any]:
+        """Get player data for a specific player"""
+        params = {"player_id": player_id}
+        return self._make_request("players", params)
+    
+    def get_players_by_team(self, team_id: str, league_id: str, season_id: str) -> Dict[str, Any]:
+        """Get players for a specific team, league and season (if this endpoint exists)"""
         params = {
             "team_id": team_id,
             "league_id": league_id,
@@ -103,8 +131,15 @@ class FBRClient:
         }
         return self._make_request("players", params)
     
-    def get_team_season_stats(self, team_id: str, league_id: str, season_id: str) -> Dict[str, Any]:
-        """Get team season statistics"""
+    def get_team_season_stats(self, league_id: int, season_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get team season statistics for a specific league and optionally season"""
+        params = {"league_id": league_id}
+        if season_id:
+            params["season_id"] = season_id
+        return self._make_request("team-season-stats", params)
+    
+    def get_team_season_stats_by_team(self, team_id: str, league_id: str, season_id: str) -> Dict[str, Any]:
+        """Get team season statistics for a specific team (if this endpoint exists)"""
         params = {
             "team_id": team_id,
             "league_id": league_id,
@@ -112,10 +147,17 @@ class FBRClient:
         }
         return self._make_request("team-season-stats", params)
     
-    def get_player_season_stats(self, team_id: str, league_id: str, season_id: str) -> Dict[str, Any]:
-        """Get player season statistics"""
+    def get_player_season_stats(self, team_id: str, league_id: int, season_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get player season statistics for a specific team, league and optionally season"""
+        params = {"team_id": team_id, "league_id": league_id}
+        if season_id:
+            params["season_id"] = season_id
+        return self._make_request("player-season-stats", params)
+    
+    def get_player_season_stats_by_player(self, player_id: str, league_id: str, season_id: str) -> Dict[str, Any]:
+        """Get player season statistics for a specific player (if this endpoint exists)"""
         params = {
-            "team_id": team_id,
+            "player_id": player_id,
             "league_id": league_id,
             "season_id": season_id
         }
@@ -144,3 +186,35 @@ class FBRClient:
         except Exception as e:
             print(f"Connection test failed: {e}")
             return False 
+
+    def get_endpoint_info(self, endpoint_name: str) -> Optional[Dict[str, Any]]:
+        """Get information about a specific endpoint"""
+        config = get_endpoint_config(endpoint_name)
+        if not config:
+            return None
+        
+        return {
+            "name": config.name,
+            "path": config.path,
+            "status": config.status.value,
+            "required_params": config.required_params,
+            "optional_params": config.optional_params,
+            "description": config.description,
+            "example_request": config.example_request,
+            "example_response": config.example_response,
+            "notes": config.notes
+        }
+    
+    def format_api_call(self, endpoint_name: str, params: Dict[str, Any]) -> str:
+        """Format an API call for the given endpoint"""
+        return format_api_call(endpoint_name, params)
+    
+    def get_working_endpoints(self) -> List[str]:
+        """Get list of working endpoint names"""
+        from .endpoint_config import get_working_endpoints
+        return [config.name for config in get_working_endpoints()]
+    
+    def get_failing_endpoints(self) -> List[str]:
+        """Get list of failing endpoint names"""
+        from .endpoint_config import get_failing_endpoints
+        return [config.name for config in get_failing_endpoints()] 
