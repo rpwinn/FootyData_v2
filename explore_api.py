@@ -210,14 +210,45 @@ def explore_matches(client, league_id="9", season_id="2022-2023", team_id=None):
     """Explore matches endpoint"""
     if team_id:
         print(f"\n=== MATCHES ENDPOINT (League {league_id}, Season {season_id}, Team {team_id}) ===")
+        print("🔍 CRITICAL INSIGHT: Team-specific matches provide SCORES!")
+        print("   - When team_id is provided, API returns team perspective with scores")
+        print("   - When no team_id, API returns league perspective without scores")
     else:
         print(f"\n=== MATCHES ENDPOINT (League {league_id}, Season {season_id}) ===")
+        print("⚠️  NOTE: League matches do NOT provide scores (API limitation)")
+        print("   - Use team_id parameter to get actual match scores")
+    
     matches = client.get_matches(league_id, season_id, team_id)
     if "error" not in matches and matches.get('data'):
         print(f"Found {len(matches['data'])} matches")
+        
+        # Check for scores
+        if team_id:
+            scored_matches = 0
+            for match in matches['data'][:5]:
+                if match.get('gf') is not None and match.get('ga') is not None:
+                    scored_matches += 1
+            print(f"📊 Matches with scores: {scored_matches}/{min(5, len(matches['data']))}")
+        
         print("Sample match data:")
         sample_match = matches['data'][0]
         print(json.dumps(sample_match, indent=2))
+        
+        # Show key differences
+        if team_id:
+            print("\n🎯 TEAM MATCH DATA STRUCTURE:")
+            print("   - result: W/L/D (team's result)")
+            print("   - gf: Goals For (team's goals)")
+            print("   - ga: Goals Against (opponent's goals)")
+            print("   - home_away: Home/Away perspective")
+            print("   - opponent: Opponent team name")
+        else:
+            print("\n📋 LEAGUE MATCH DATA STRUCTURE:")
+            print("   - home_team_score: None (no scores)")
+            print("   - away_team_score: None (no scores)")
+            print("   - home: Home team name")
+            print("   - away: Away team name")
+        
         return True
     else:
         print(f"Error: {matches.get('error', 'Unknown error')}")

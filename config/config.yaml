@@ -2,33 +2,133 @@
 
 api:
   base_url: "https://fbrapi.com"
-  rate_limit_delay: 3  # seconds between requests
+  rate_limit_delay: 6  # seconds between requests
   timeout: 30  # seconds
 
 database:
   staging_schema: "staging"
   final_schema: "football"
-  
-# Target leagues for initial data collection
-leagues:
-  - name: "Premier League"
-    country_code: "ENG"
-    league_id: "9"
-  - name: "La Liga"
-    country_code: "ESP" 
-    league_id: "12"
-  - name: "Bundesliga"
-    country_code: "GER"
-    league_id: "20"
-  - name: "Serie A"
-    country_code: "ITA"
-    league_id: "11"
-  - name: "Ligue 1"
-    country_code: "FRA"
-    league_id: "13"
 
-# Seasons to collect data for
-seasons:
-  - "2023-2024"
-  - "2022-2023"
-  - "2021-2022" 
+# Data Collection Configuration
+# Only includes endpoints we have documented and implemented
+data_collection:
+  # Global settings
+  global:
+    enable_rate_limiting: true
+    max_retries: 3
+    retry_delay: 10  # seconds
+    user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    
+  # Implemented endpoints (countries and leagues only)
+  endpoints:
+    countries:
+      enabled: true
+      priority: "high"
+      collection_strategy: "full"  # full, incremental, selective
+      
+      # API parameters (from documented endpoint)
+      api_params:
+        country: null  # optional string parameter
+      
+      # Data filtering options
+      filters:
+        include_all_countries: true
+        exclude_countries: []  # list of country codes to skip
+        governing_bodies: []   # empty = all, or ["UEFA", "CONCACAF", etc.]
+        
+      # Performance settings
+      performance:
+        batch_size: 1  # countries endpoint returns all countries in one call
+        cache_responses: true
+        
+    leagues:
+      enabled: true
+      priority: "high"
+      collection_strategy: "full"
+      
+      # API parameters (from documented endpoint)
+      api_params:
+        country_code: "required"  # required string parameter
+      
+      # Data filtering options
+      filters:
+        # Country filtering for leagues collection
+        target_countries: []  # empty = all countries from countries endpoint
+        exclude_countries: []  # list of country codes to skip
+        
+        # League type filtering
+        include_league_types:
+          - "domestic_leagues"
+          - "domestic_cups"
+          - "international_competitions"
+          - "national_team_competitions"
+        
+        # Gender filtering
+        include_genders:
+          - "M"  # male
+          - "F"  # female
+          
+        # Tier filtering
+        include_tiers:
+          - "1st"
+          - "2nd"
+          - "3rd"
+          - "4th"
+        
+      # Performance settings
+      performance:
+        batch_size: 1  # one country at a time due to rate limiting
+        parallel_requests: 1  # rate limited to 1 request per 6 seconds
+        cache_responses: true
+
+# Data Quality and Validation
+data_quality:
+  validation:
+    check_required_fields: true
+    validate_foreign_keys: true
+    check_data_types: true
+    
+  cleaning:
+    remove_duplicates: true
+    standardize_names: true
+    validate_dates: true
+    
+  monitoring:
+    log_data_quality_issues: true
+    alert_on_high_error_rate: true
+    error_rate_threshold: 0.05  # 5%
+
+# Storage and Archival
+storage:
+  staging:
+    retention_days: 30
+    compression: true
+    
+  production:
+    retention_days: 365
+    compression: true
+    partitioning: true
+
+# Logging and Monitoring
+logging:
+  level: "INFO"
+  file_rotation: true
+  max_file_size: "10MB"
+  backup_count: 5
+  
+  metrics:
+    track_api_calls: true
+    track_processing_time: true
+    track_error_rates: true
+    track_data_volume: true
+
+# Development and Testing
+development:
+  test_mode: false
+  mock_api_responses: false
+  sample_data_only: false
+  
+  debugging:
+    log_raw_responses: false
+    log_sql_queries: false
+    verbose_error_messages: true 
