@@ -2,6 +2,27 @@
 
 A football data collection system using the FBR API to gather comprehensive football statistics and store them in a PostgreSQL database with a proper data warehouse architecture.
 
+## ⚠️ Important Setup Notes
+
+### Python Version
+- **Always use `python3`** instead of `python` for running scripts
+- The `python` command may not be available or may point to Python 2
+- Example: `python3 src/etl/test_league_seasons_data.py`
+
+### Database Connection
+- **DATABASE_URL environment variable only works with `python3`**
+- The `psycopg2` library requires Python 3 for proper environment variable handling
+- Always run database scripts with `python3` to ensure proper connection
+
+### Example Usage
+```bash
+# ✅ Correct way
+python3 src/etl/test_league_seasons_data.py
+
+# ❌ May not work
+python src/etl/test_league_seasons_data.py
+```
+
 ## Overview
 
 This project replaces web scraping with API-based data collection using the FBR API (https://fbrapi.com/documentation) to gather football data from fbref.com. The system implements a three-schema data warehouse architecture:
@@ -17,10 +38,11 @@ This project replaces web scraping with API-based data collection using the FBR 
 #### **Staging Schema** (`staging.*`)
 ```sql
 -- Raw API responses with denormalized data
+staging.countries        -- Raw country data ✅
+staging.leagues          -- Raw league data ✅
+staging.league_seasons   -- Raw league seasons data ✅
 staging.matches          -- Raw match data (includes team names)
 staging.players          -- Raw player data
-staging.countries        -- Raw country data
-staging.leagues          -- Raw league data
 staging.teams            -- Raw team data
 ```
 
@@ -66,6 +88,19 @@ fact.team_schedules      -- Team fixture facts
 - Contains **measurements** and **metrics**
 - **High volume** (many rows)
 - Used for **analytics** and **reporting**
+
+### 📊 Data Collection Summary
+
+#### **Completed Collections**
+- **Countries**: All countries from `/countries` endpoint ✅
+- **Leagues**: All leagues from `/leagues` endpoint (by country) ✅
+- **League Seasons**: 1,740 seasons from 107 leagues via `/league-seasons` endpoint ✅
+
+#### **Collection Statistics**
+- **Countries**: 195 countries collected
+- **Leagues**: 1,234 league entries (including international competitions across multiple countries)
+- **League Seasons**: 1,740 seasons across 107 unique leagues
+- **Top League**: Premier League (ENG) with 127 seasons
 
 ### 🔄 ETL Strategy
 
@@ -258,6 +293,34 @@ Based on our analysis of FBR API endpoints:
 ### 📈 **Aggregated Data** (2 endpoints)
 - `/team-season-stats` - Team performance summaries
 - `/player-season-stats` - Player performance summaries
+
+## Data Completeness Issues
+
+### Current Known Issues
+
+#### ISSUE-001: League Season Details API Endpoint Failures
+- **Status**: Open (API Provider Issue)
+- **Severity**: High
+- **Impact**: 54% failure rate for league season details collection
+- **Details**: The `/league-season-details` endpoint returns 500 Internal Server Errors for major domestic leagues (Premier League, La Liga, Serie A, Bundesliga, Ligue 1)
+- **Workaround**: Focus on international competitions and smaller leagues that work properly
+- **Documentation**: See `data_issues/ISSUE-001_league_season_details_missing_data.md`
+
+### Data Collection Success Rates
+- **Countries**: 100% (195/195 countries)
+- **Leagues**: 100% (1,234 league entries)
+- **League Seasons**: 100% (1,740 seasons collected)
+- **League Season Details**: 46% (800/1,740 combinations successful)
+
+### Monitoring
+All data completeness issues are tracked in the `data_issues/` directory with detailed investigation reports and resolution plans.
+
+## 🛠️ Common Issues
+
+### Database Connection
+- **DATABASE_URL environment variable only works with `python3`**
+- The `psycopg2` library requires Python 3 for proper environment variable handling
+- Always run database scripts with `python3` to ensure proper connection
 
 ## License
 

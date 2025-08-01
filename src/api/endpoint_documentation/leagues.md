@@ -7,7 +7,6 @@ Endpoint to retrieve meta-data for all unique leagues associated with a specifie
 - **URL**: `/leagues`
 - **Method**: GET
 - **Base URL**: https://fbrapi.com
-- **Rate Limit**: 1 request per 3 seconds
 
 ## Parameters
 
@@ -96,6 +95,45 @@ GET /leagues?country_code=JPN
 ### Get All Leagues for England
 ```bash
 GET /leagues?country_code=ENG
+```
+
+### Using curl
+```bash
+curl -H "X-API-Key: YOUR_API_KEY" \
+     -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+     "https://fbrapi.com/leagues/?country_code=ENG"
+```
+
+### Using Python
+```python
+import requests
+
+headers = {
+    'X-API-Key': 'YOUR_API_KEY',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+}
+
+# Get all leagues for England
+response = requests.get('https://fbrapi.com/leagues/?country_code=ENG', headers=headers)
+england_leagues = response.json()
+
+# Get all leagues for Japan
+response = requests.get('https://fbrapi.com/leagues/?country_code=JPN', headers=headers)
+japan_leagues = response.json()
+```
+
+### Using JavaScript/Fetch
+```javascript
+fetch('https://fbrapi.com/leagues/?country_code=ENG', {
+    headers: {
+        'X-API-Key': 'YOUR_API_KEY',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+    }
+})
+.then(response => response.json())
+.then(data => {
+    console.log('England Leagues:', data.data);
+});
 ```
 
 ## Data Volume

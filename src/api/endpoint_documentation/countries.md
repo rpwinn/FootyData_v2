@@ -7,7 +7,6 @@ Endpoint to retrieve meta-data for all available countries that have either dome
 - **URL**: `/countries`
 - **Method**: GET
 - **Base URL**: https://fbrapi.com
-- **Rate Limit**: 1 request per 3 seconds
 
 ## Parameters
 
@@ -73,6 +72,45 @@ GET /countries
 ### Get Specific Country
 ```bash
 GET /countries?country=England
+```
+
+### Using curl
+```bash
+curl -H "X-API-Key: YOUR_API_KEY" \
+     -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+     "https://fbrapi.com/countries/"
+```
+
+### Using Python
+```python
+import requests
+
+headers = {
+    'X-API-Key': 'YOUR_API_KEY',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+}
+
+# Get all countries
+response = requests.get('https://fbrapi.com/countries/', headers=headers)
+countries_data = response.json()
+
+# Get specific country
+response = requests.get('https://fbrapi.com/countries/?country=England', headers=headers)
+england_data = response.json()
+```
+
+### Using JavaScript/Fetch
+```javascript
+fetch('https://fbrapi.com/countries/', {
+    headers: {
+        'X-API-Key': 'YOUR_API_KEY',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+    }
+})
+.then(response => response.json())
+.then(data => {
+    console.log('Countries:', data.data);
+});
 ```
 
 ## Data Volume

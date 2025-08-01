@@ -54,7 +54,8 @@ class FBRClient:
         """Make a rate-limited request to the FBR API"""
         self._rate_limit()
         
-        url = f"{self.base_url}/{endpoint}"
+        # Add trailing slash to handle redirects properly
+        url = f"{self.base_url}/{endpoint}/"
         
         try:
             response = self.session.get(url, params=params, timeout=self.timeout)
@@ -74,10 +75,17 @@ class FBRClient:
         params = {"country_code": country_code} if country_code else None
         return self._make_request("leagues", params)
     
-    def get_league_seasons(self, league_id: str) -> Dict[str, Any]:
+    def get_league_seasons(self, league_id: int) -> Dict[str, Any]:
         """Get seasons for a specific league"""
         params = {"league_id": league_id}
         return self._make_request("league-seasons", params)
+    
+    def get_league_season_details(self, league_id: int, season_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get details for a specific league and season"""
+        params = {"league_id": league_id}
+        if season_id:
+            params["season_id"] = season_id
+        return self._make_request("league-season-details", params)
     
     def get_league_standings(self, league_id: int, season_id: Optional[str] = None) -> Dict[str, Any]:
         """Get league standings for a specific league and optionally season"""

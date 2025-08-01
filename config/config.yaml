@@ -19,8 +19,8 @@ data_collection:
     retry_delay: 10  # seconds
     user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
     
-  # Implemented endpoints (countries and leagues only)
-  endpoints:
+      # Implemented endpoints (countries, leagues, and league-seasons)
+    endpoints:
     countries:
       enabled: true
       priority: "high"
@@ -78,6 +78,36 @@ data_collection:
       # Performance settings
       performance:
         batch_size: 1  # one country at a time due to rate limiting
+        parallel_requests: 1  # rate limited to 1 request per 6 seconds
+        cache_responses: true
+        
+    league_seasons:
+      enabled: true
+      priority: "high"
+      collection_strategy: "full"
+      
+      # API parameters (from documented endpoint)
+      api_params:
+        league_id: "required"  # required integer parameter
+      
+      # Data filtering options
+      filters:
+        # League filtering for seasons collection
+        target_leagues: []  # empty = all leagues from leagues endpoint
+        exclude_leagues: []  # list of league_ids to skip
+        
+        # Season filtering
+        include_season_formats:
+          - "YYYY-YYYY"  # European format
+          - "YYYY"       # Other formats
+        
+        # Data quality filters
+        min_squads: 0  # minimum number of squads required
+        require_champion: false  # whether to skip seasons without champions
+        
+      # Performance settings
+      performance:
+        batch_size: 1  # one league at a time due to rate limiting
         parallel_requests: 1  # rate limited to 1 request per 6 seconds
         cache_responses: true
 

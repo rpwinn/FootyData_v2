@@ -75,21 +75,63 @@ ENDPOINT_CONFIGS = {
         name="League Seasons",
         path="/league-seasons",
         status=EndpointStatus.WORKING,
-        required_params={"league_id": "string"},
+        required_params={"league_id": "integer"},
         optional_params={},
         description="Returns all seasons for a specific league",
-        example_request={"league_id": "9"},
+        example_request={"league_id": 9},
         example_response={
-            "season_id": "2025-2026",
-            "competition_name": "Premier League",
-            "#_squads": 20,
-            "champion": "",
-            "top_scorer": {
-                "player": "",
-                "goals_scored": None
+            "data": [
+                {
+                    "season_id": "2023-2024",
+                    "competition_name": "Premier League",
+                    "#_squads": 20,
+                    "champion": "Manchester City",
+                    "top_scorer": {
+                        "player": "Erling Haaland",
+                        "goals_scored": 27
+                    }
+                },
+                {
+                    "season_id": "2022-2023",
+                    "competition_name": "Premier League",
+                    "#_squads": 20,
+                    "champion": "Manchester City",
+                    "top_scorer": {
+                        "player": "Erling Haaland",
+                        "goals_scored": 36
+                    }
+                }
+            ]
+        },
+        notes="Returns seasons for a specific league with champion and top scorer data"
+    ),
+    
+    "league_season_details": EndpointConfig(
+        name="League Season Details",
+        path="/league-season-details",
+        status=EndpointStatus.PARTIAL,
+        required_params={"league_id": "integer"},
+        optional_params={"season_id": "string"},
+        description="Returns meta-data for a specific league id and season id",
+        example_request={"league_id": 8, "season_id": "2018-2019"},
+        example_response={
+            "data": {
+                "lg_id": 8,
+                "season_id": "2018-2019",
+                "league_start": "2018-09-18",
+                "league_end": "Date",
+                "league_type": "cup",
+                "has_adv_stats": "yes",
+                "rounds": [
+                    "Round of 16",
+                    "Final",
+                    "Quarter-finals",
+                    "Semi-finals",
+                    "Group stage"
+                ]
             }
         },
-        notes="Returns 127 seasons for Premier League"
+        notes="Returns metadata for specific league-season combination including dates, type, and rounds. Works for some leagues (e.g., Champions League) but returns 500 errors for others (e.g., Premier League)"
     ),
     
     "league_standings": EndpointConfig(

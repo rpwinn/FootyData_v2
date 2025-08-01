@@ -1,0 +1,92 @@
+# Football Data Collection Configuration
+# Defines predefined scopes for cascading data collection
+
+# Time period definitions
+time_periods:
+  default_2024:
+    description: "2024 or 2024-2025 season (default)"
+    start_season: "2024"
+    end_season: "2024-2025"
+    pattern: "^(2024|2024-2025)$"
+    
+  2020s:
+    description: "All seasons from 2020 onwards"
+    start_season: "2020"
+    end_season: null  # null means "current season"
+    pattern: "2020|2020-2021|2021|2021-2022|2022|2022-2023|2023|2023-2024|2024|2024-2025|2025|2025-2026"
+
+collection_scopes:
+  # Major European leagues (excluding Belgium)
+  european_majors:
+    description: "Major European football leagues"
+    countries: ['ENG', 'GER', 'FRA', 'ESP', 'ITA', 'NED', 'POR']
+    time_period: "default_2024"  # Default 2024/2024-2025
+    priority: "high"
+    
+  # All English football competitions (including cups)
+  english_football:
+    description: "All English football competitions including cups"
+    countries: ['ENG']
+    time_period: "default_2024"  # Default 2024/2024-2025
+    priority: "medium"
+    
+  # European cup competitions
+  european_cups:
+    description: "European cup competitions (Champions League, Europa League, Conference League)"
+    leagues: ['Champions League', 'Europa League', 'Conference League']
+    time_period: "default_2024"  # Default 2024/2024-2025
+    priority: "high"
+    
+  # Premier League only
+  premier_league_only:
+    description: "English Premier League only"
+    countries: ['ENG']
+    leagues: ['Premier League']
+    time_period: "default_2024"  # Default 2024/2024-2025
+    priority: "high"
+    
+  # 2020s versions (extended time period)
+  european_majors_2020s:
+    description: "Major European football leagues (2020s)"
+    countries: ['ENG', 'GER', 'FRA', 'ESP', 'ITA', 'NED', 'POR']
+    time_period: "2020s"
+    priority: "medium"
+    
+  english_football_2020s:
+    description: "All English football competitions (2020s)"
+    countries: ['ENG']
+    time_period: "2020s"
+    priority: "medium"
+    
+  european_cups_2020s:
+    description: "European cup competitions (2020s)"
+    leagues: ['Champions League', 'Europa League', 'Conference League']
+    time_period: "2020s"
+    priority: "medium"
+    
+  premier_league_2020s:
+    description: "English Premier League only (2020s)"
+    countries: ['ENG']
+    leagues: ['Premier League']
+    time_period: "2020s"
+    priority: "medium"
+
+# Default settings for collection
+defaults:
+  rate_limit_delay: 6  # seconds between API calls
+  retry_attempts: 3
+  batch_size: 10  # process in batches of 10
+  checkpoint_interval: 50  # save checkpoint every 50 items
+  
+# Error handling configuration
+error_handling:
+  continue_on_failure: true
+  log_failures: true
+  retry_on_429: true  # retry on rate limit errors
+  max_consecutive_failures: 5
+  
+# Progress tracking
+progress:
+  log_interval: 10  # log progress every 10 items
+  estimate_remaining: true
+  show_percentage: true 
