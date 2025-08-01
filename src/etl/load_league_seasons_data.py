@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Load League Seasons Data from FBR API to Staging Table
-Parameterized version with selective update logic
+Parameterized version for cascading collection framework
 """
 
 import os
@@ -17,6 +17,131 @@ from typing import List, Optional, Dict, Any
 sys.path.append('src')
 
 from api.fbr_client import FBRClient
+
+def get_league_season_format(league_id: int, database_url: str) -> str:
+    """
+    Analyze existing seasons to determine format (YYYY vs YYYY-YYYY)
+    
+    Args:
+        league_id: League ID to analyze
+        database_url: Database connection string
+    
+    Returns:
+        str: "YYYY-YYYY" or "YYYY" based on dominant format
+    """
+    try:
+        with psycopg2.connect(database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT season_id 
+                    FROM staging.league_seasons 
+                    WHERE league_id = %s 
+                    ORDER BY season_id
+                """, (league_id,))
+                
+                seasons = [row[0] for row in cur.fetchall()]
+                
+                if not seasons:
+                    # No existing data, use default format
+                    return "YYYY-YYYY"
+                
+                # Analyze format patterns
+                yyyy_yyyy_count = sum(1 for s in seasons if re.match(r"^\d{4}-\d{4}$", s))
+                yyyy_count = sum(1 for s in seasons if re.match(r"^\d{4}$", s))
+                
+                # Return dominant format
+                if yyyy_yyyy_count >= yyyy_count:
+                    return "YYYY-YYYY"
+                else:
+                    return "YYYY"
+                    
+    except Exception as e:
+        print(f"❌ Error analyzing format for league {league_id}: {e}")
+        return "YYYY-YYYY"  # Default to YYYY-YYYY format
+
+def get_max_available_season(league_id: int, database_url: str) -> str:
+    """
+    Get max season from leagues table (always current with API)
+    
+    Args:
+        league_id: League ID to check
+        database_url: Database connection string
+    
+    Returns:
+        str: Latest season available according to API
+    """
+    try:
+        with psycopg2.connect(database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT last_season 
+                    FROM staging.leagues 
+                    WHERE league_id = %s
+                """, (league_id,))
+                
+                result = cur.fetchone()
+                if result and result[0]:
+                    return result[0]
+                else:
+                    return None
+                    
+    except Exception as e:
+        print(f"❌ Error getting max season for league {league_id}: {e}")
+        return None
+
+def generate_league_specific_pattern(league_id: int, time_period: str, database_url: str) -> str:
+    """
+    Generate pattern only for the format this league uses
+    
+    Args:
+        league_id: League ID to generate pattern for
+        time_period: Time period name (e.g., "2020s", "default_2024")
+        database_url: Database connection string
+    
+    Returns:
+        str: Regex pattern for seasons in this league's format
+    """
+    # Get format from existing data
+    format_type = get_league_season_format(league_id, database_url)
+    
+    # Get max season from leagues table
+    max_season = get_max_available_season(league_id, database_url)
+    
+    # Generate format-specific patterns
+    if format_type == "YYYY-YYYY":
+        if time_period == "2020s":
+            # Only include seasons up to max_season
+            if max_season and re.match(r"^\d{4}-\d{4}$", max_season):
+                max_year = int(max_season.split('-')[1])  # Get end year
+                patterns = []
+                for year in range(2020, max_year + 1):
+                    patterns.append(f"{year}-{year+1}")
+                return f"^({'|'.join(patterns)})$"
+            else:
+                # Default 2020s pattern for YYYY-YYYY format
+                return r"^(2020-2021|2021-2022|2022-2023|2023-2024|2024-2025|2025-2026)$"
+        elif time_period == "default_2024":
+            return r"^(2024-2025)$"
+        else:
+            # Default pattern for YYYY-YYYY format
+            return r"^(2020-2021|2021-2022|2022-2023|2023-2024|2024-2025|2025-2026)$"
+    else:  # YYYY format
+        if time_period == "2020s":
+            # Only include seasons up to max_season
+            if max_season and re.match(r"^\d{4}$", max_season):
+                max_year = int(max_season)
+                patterns = []
+                for year in range(2020, max_year + 1):
+                    patterns.append(str(year))
+                return f"^({'|'.join(patterns)})$"
+            else:
+                # Default 2020s pattern for YYYY format
+                return r"^(2020|2021|2022|2023|2024|2025|2026)$"
+        elif time_period == "default_2024":
+            return r"^(2024)$"
+        else:
+            # Default pattern for YYYY format
+            return r"^(2020|2021|2022|2023|2024|2025|2026)$"
 
 def load_league_seasons_data(league_ids: Optional[List[int]] = None, 
                            time_period: Optional[str] = None,
@@ -81,6 +206,22 @@ def load_league_seasons_data(league_ids: Optional[List[int]] = None,
                     print(f"\n📡 Processing league ID: {league_id}")
                     
                     try:
+                        # Pre-check: Skip leagues that don't need updates
+                        if time_period:
+                            # Use smart pattern recognition to check if this league needs updates
+                            expected_seasons = set()
+                            try:
+                                pattern = generate_league_specific_pattern(league_id, time_period, database_url)
+                                if pattern.startswith("^(") and pattern.endswith(")$"):
+                                    seasons_str = pattern[2:-2]  # Remove ^( and )$
+                                    seasons = seasons_str.split("|")
+                                    for season in seasons:
+                                        expected_seasons.add(season.strip())
+                            except Exception as e:
+                                print(f"❌ Error generating pattern for league {league_id}: {e}")
+                                # Fall back to processing the league
+                                expected_seasons = set()
+                        
                         # Get existing seasons for this league
                         cur.execute("""
                             SELECT season_id, competition_name, num_squads, champion, 
@@ -89,6 +230,13 @@ def load_league_seasons_data(league_ids: Optional[List[int]] = None,
                             WHERE league_id = %s
                         """, (league_id,))
                         existing_seasons = {row[0]: row[1:] for row in cur.fetchall()}
+                        
+                        # Check if we already have all expected seasons
+                        if time_period and expected_seasons:
+                            missing_seasons = expected_seasons - set(existing_seasons.keys())
+                            if not missing_seasons:
+                                print(f"  ✅ League {league_id}: All expected seasons already present, skipping API call")
+                                continue
                         
                         # Get fresh API data
                         seasons_response = client.get_league_seasons(league_id)
@@ -107,8 +255,8 @@ def load_league_seasons_data(league_ids: Optional[List[int]] = None,
                         for season in data:
                             season_id = season.get('season_id')
                             
-                            # Apply time period filter if specified
-                            if time_period and not matches_time_period(season_id, time_period):
+                            # Apply time period filter if specified (using smart pattern matching)
+                            if time_period and not matches_time_period(season_id, time_period, league_id, database_url):
                                 continue
                             
                             # Skip if season doesn't exist in database and we're in update-only mode
@@ -187,25 +335,36 @@ def load_league_seasons_data(league_ids: Optional[List[int]] = None,
         print(f"❌ Error loading data: {e}")
         return False
 
-def matches_time_period(season_id: str, time_period: str) -> bool:
+def matches_time_period(season_id: str, time_period: str, league_id: Optional[int] = None, database_url: Optional[str] = None) -> bool:
     """
     Check if a season ID matches the specified time period
     
     Args:
         season_id: Season ID string (e.g., "2024", "2024-2025")
         time_period: Time period name or pattern (e.g., "default_2024", "2020s", "^(2024|2024-2025)$")
+        league_id: Optional league ID for smart pattern generation
+        database_url: Optional database URL for smart pattern generation
     
     Returns:
         bool: True if season matches time period
     """
     
-    # Handle time period names from config
+    # If we have league_id and database_url, use smart pattern generation
+    if league_id and database_url:
+        try:
+            pattern = generate_league_specific_pattern(league_id, time_period, database_url)
+            return bool(re.match(pattern, season_id))
+        except Exception as e:
+            print(f"❌ Error in smart pattern matching for league {league_id}: {e}")
+            # Fall back to basic matching
+    
+    # Handle time period names from config (fallback)
     if time_period == "default_2024":
         # Match 2024 or 2024-2025
         return bool(re.match(r"^(2024|2024-2025)$", season_id))
     elif time_period == "2020s":
-        # Match any season starting with 2020
-        return bool(re.match(r"^2020", season_id))
+        # Match the full 2020s pattern from config
+        return bool(re.match(r"^(2020|2020-2021|2021|2021-2022|2022|2022-2023|2023|2023-2024|2024|2024-2025|2025|2025-2026)$", season_id))
     elif time_period == "recent_seasons":
         # Match last 5 years
         current_year = datetime.now().year

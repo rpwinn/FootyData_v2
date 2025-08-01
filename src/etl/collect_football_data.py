@@ -177,15 +177,15 @@ class FootballDataCollector:
                         self.log(f"Time period '{time_period}' not found, assuming fresh", "WARN")
                         return True, []
                     
-                    # Get expected seasons for this time period
-                    expected_seasons = self._get_expected_seasons_for_time_period(time_period_config)
-                    
-                    if self.verbose:
-                        self.log(f"Expected seasons for time period '{time_period}': {sorted(expected_seasons)}", "INFO")
-                    
                     leagues_needing_seasons = []
                     
                     for league_id in league_ids:
+                        # Get league-specific expected seasons using smart pattern recognition
+                        expected_seasons = self._get_expected_seasons_for_time_period(time_period_config, league_id, time_period)
+                        
+                        if self.verbose:
+                            self.log(f"League {league_id} expected seasons for '{time_period}': {sorted(expected_seasons)}", "INFO")
+                        
                         if league_id not in existing_seasons:
                             # No seasons at all for this league
                             if self.verbose:
@@ -193,7 +193,7 @@ class FootballDataCollector:
                             leagues_needing_seasons.append(league_id)
                             continue
                         
-                        # Check if we have all expected seasons
+                        # Check if we have all expected seasons for this league
                         missing_seasons = expected_seasons - existing_seasons[league_id]
                         existing_count = len(existing_seasons[league_id])
                         expected_count = len(expected_seasons)
@@ -219,10 +219,35 @@ class FootballDataCollector:
             self.log(f"Error checking league seasons: {e}", "ERROR")
             return False, league_ids
     
-    def _get_expected_seasons_for_time_period(self, time_period_config) -> set:
+    def _get_expected_seasons_for_time_period(self, time_period_config, league_id: Optional[int] = None, time_period_name: Optional[str] = None) -> set:
         """Get expected seasons for a time period configuration"""
         import re
         
+        # If we have a specific league_id, use smart pattern recognition
+        if league_id and time_period_name:
+            try:
+                from etl.load_league_seasons_data import generate_league_specific_pattern
+                pattern = generate_league_specific_pattern(league_id, time_period_name, self.database_url)
+                
+                # Parse the smart pattern to get expected seasons
+                expected_seasons = set()
+                if pattern.startswith("^(") and pattern.endswith(")$"):
+                    # Extract seasons from pattern like "^(2020-2021|2021-2022)$"
+                    seasons_str = pattern[2:-2]  # Remove ^( and )$
+                    seasons = seasons_str.split("|")
+                    for season in seasons:
+                        expected_seasons.add(season.strip())
+                else:
+                    # Fallback to basic pattern matching
+                    expected_seasons.add(pattern)
+                
+                return expected_seasons
+                
+            except Exception as e:
+                self.log(f"Error in smart pattern generation for league {league_id}: {e}", "WARN")
+                # Fall back to basic logic
+        
+        # Basic logic (fallback)
         pattern = time_period_config.pattern
         expected_seasons = set()
         
@@ -395,9 +420,13 @@ class FootballDataCollector:
             
             if not seasons_fresh or force_refresh:
                 self.log("League seasons need updating, collecting...")
-                if not self.collect_league_seasons(league_ids, scope_time_period):
-                    self.log("Failed to collect league seasons data", "ERROR")
-                    return False
+                # Only collect for leagues that actually need updates
+                if leagues_needing_seasons:
+                    if not self.collect_league_seasons(leagues_needing_seasons, scope_time_period):
+                        self.log("Failed to collect league seasons data", "ERROR")
+                        return False
+                else:
+                    self.log("No leagues need season updates", "INFO")
             else:
                 self.log("League seasons are fresh for time period, skipping collection", "INFO")
         else:
