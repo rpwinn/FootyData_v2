@@ -29,8 +29,8 @@ def check_api_health():
         results = {}
         overall_healthy = True
         
-        # Test 1: Countries endpoint
-        print("\n📡 Testing countries endpoint...")
+        # Test 1: Countries endpoint (all countries)
+        print("\n📡 Testing countries endpoint (all countries)...")
         start_time = time.time()
         countries_response = client.get_countries()
         end_time = time.time()
@@ -56,37 +56,22 @@ def check_api_health():
             print(f"⏱️ Response time: {end_time - start_time:.2f} seconds")
             results['countries'] = {'status': 'working', 'response_time': end_time - start_time}
         
-        # Test 2: Leagues endpoint (no country)
-        print("\n📡 Testing leagues endpoint (no country)...")
-        start_time = time.time()
-        leagues_response = client.get_leagues()
-        end_time = time.time()
-        
-        if "error" in leagues_response:
-            print(f"❌ Leagues API failed: {leagues_response['error']}")
-            results['leagues_no_country'] = {'status': 'failed', 'error': leagues_response['error']}
-            overall_healthy = False
-        else:
-            print(f"✅ Leagues API working: {len(leagues_response.get('data', []))} league types")
-            print(f"⏱️ Response time: {end_time - start_time:.2f} seconds")
-            results['leagues_no_country'] = {'status': 'working', 'response_time': end_time - start_time}
-        
-        # Test 3: Leagues endpoint (with country)
-        print("\n📡 Testing leagues endpoint (ENG country)...")
+        # Test 2: Leagues endpoint (ENG example)
+        print("\n📡 Testing leagues endpoint (ENG example)...")
         start_time = time.time()
         eng_leagues_response = client.get_leagues("ENG")
         end_time = time.time()
         
         if "error" in eng_leagues_response:
-            print(f"❌ ENG Leagues API failed: {eng_leagues_response['error']}")
-            results['leagues_eng'] = {'status': 'failed', 'error': eng_leagues_response['error']}
+            print(f"❌ Leagues API failed: {eng_leagues_response['error']}")
+            results['leagues'] = {'status': 'failed', 'error': eng_leagues_response['error']}
             overall_healthy = False
         else:
-            print(f"✅ ENG Leagues API working: {len(eng_leagues_response.get('data', []))} league types")
+            print(f"✅ Leagues API working: {len(eng_leagues_response.get('data', []))} league types")
             print(f"⏱️ Response time: {end_time - start_time:.2f} seconds")
-            results['leagues_eng'] = {'status': 'working', 'response_time': end_time - start_time}
+            results['leagues'] = {'status': 'working', 'response_time': end_time - start_time}
         
-        # Test 4: League seasons endpoint
+        # Test 3: League seasons endpoint
         print("\n📡 Testing league seasons endpoint (League 9)...")
         start_time = time.time()
         seasons_response = client.get_league_seasons(9)

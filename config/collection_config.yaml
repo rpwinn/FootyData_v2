@@ -89,4 +89,40 @@ error_handling:
 progress:
   log_interval: 10  # log progress every 10 items
   estimate_remaining: true
-  show_percentage: true 
+  show_percentage: true
+
+# Endpoint blacklist configuration
+endpoint_blacklist:
+  enabled: true
+  permanent_failures:
+    # League seasons endpoint - broken leagues
+    - endpoint: "league-seasons"
+      league_ids: [602, 604, 606, 612, 646]
+      reason: "One-off competitions don't support seasons endpoint"
+    
+    # League season details endpoint - broken leagues
+    - endpoint: "league-season-details"
+      league_ids: [9, 11, 12]  # Premier League, Bundesliga, La Liga
+      reason: "Returns 500 Server Error for these leagues"
+    
+    # Teams endpoint - broken (consistently returns 500 errors)
+    - endpoint: "teams"
+      reason: "Consistently returns 500 Server Error for all team IDs"
+    
+    # Example: League standings endpoint - broken league/season combinations
+    # - endpoint: "league-standings"
+    #   league_ids: [999]
+    #   season_ids: ["2023-2024"]
+    #   reason: "Standings not available for this league/season"
+    
+    # Example: Team stats endpoint - broken teams
+    # - endpoint: "team-season-stats"
+    #   team_ids: [123, 456]
+    #   reason: "Team stats not available for these teams"
+    
+    # Example: Player stats endpoint - broken players
+    # - endpoint: "player-season-stats"
+    #   player_ids: [789, 101]
+    #   reason: "Player stats not available for these players"
+  
+  retry_after_days: 30  # Retry blacklisted endpoints after 30 days 

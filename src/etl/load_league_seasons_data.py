@@ -114,7 +114,7 @@ def generate_league_specific_pattern(league_id: int, time_period: str, database_
             if max_season and re.match(r"^\d{4}-\d{4}$", max_season):
                 max_year = int(max_season.split('-')[1])  # Get end year
                 patterns = []
-                for year in range(2020, max_year + 1):
+                for year in range(2020, max_year):  # Stop at max_year, not max_year + 1
                     patterns.append(f"{year}-{year+1}")
                 return f"^({'|'.join(patterns)})$"
             else:
@@ -131,7 +131,7 @@ def generate_league_specific_pattern(league_id: int, time_period: str, database_
             if max_season and re.match(r"^\d{4}$", max_season):
                 max_year = int(max_season)
                 patterns = []
-                for year in range(2020, max_year + 1):
+                for year in range(2020, max_year + 1):  # For YYYY format, include the max_year
                     patterns.append(str(year))
                 return f"^({'|'.join(patterns)})$"
             else:

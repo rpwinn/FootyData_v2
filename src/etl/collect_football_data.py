@@ -18,9 +18,11 @@ sys.path.append('src')
 
 from api.fbr_client import FBRClient
 from utils.collection_config import load_collection_config
+from utils.endpoint_blacklist import load_endpoint_blacklist
 from etl.load_countries_data import load_countries_data
 from etl.load_leagues_data import load_leagues_data
 from etl.load_league_seasons_data import load_league_seasons_data
+from etl.load_league_season_details_data import load_league_season_details_data
 
 class FootballDataCollector:
     """Master orchestrator for football data collection"""
@@ -32,6 +34,7 @@ class FootballDataCollector:
         self.client = FBRClient()
         self.dry_run = dry_run
         self.verbose = verbose
+        self.blacklist = load_endpoint_blacklist()
         
         if not self.database_url:
             raise ValueError("DATABASE_URL not found in .env file")
@@ -180,8 +183,26 @@ class FootballDataCollector:
                     leagues_needing_seasons = []
                     
                     for league_id in league_ids:
+                        # Check if this league is blacklisted for league-seasons endpoint
+                        if self.blacklist.is_blacklisted("league-seasons", league_id=league_id):
+                            if self.verbose:
+                                self.log(f"League {league_id} is blacklisted for league-seasons endpoint, skipping", "INFO")
+                            continue
+                        
+                        # Get the league's last_season from the database
+                        last_season = None
+                        try:
+                            with psycopg2.connect(self.database_url) as conn:
+                                with conn.cursor() as cur:
+                                    cur.execute("SELECT last_season FROM staging.leagues WHERE league_id = %s", (league_id,))
+                                    result = cur.fetchone()
+                                    if result:
+                                        last_season = result[0]
+                        except Exception as e:
+                            self.log(f"Error getting last_season for league {league_id}: {e}", "WARN")
+                        
                         # Get league-specific expected seasons using smart pattern recognition
-                        expected_seasons = self._get_expected_seasons_for_time_period(time_period_config, league_id, time_period)
+                        expected_seasons = self._get_expected_seasons_for_time_period(time_period_config, league_id, time_period, last_season)
                         
                         if self.verbose:
                             self.log(f"League {league_id} expected seasons for '{time_period}': {sorted(expected_seasons)}", "INFO")
@@ -219,8 +240,8 @@ class FootballDataCollector:
             self.log(f"Error checking league seasons: {e}", "ERROR")
             return False, league_ids
     
-    def _get_expected_seasons_for_time_period(self, time_period_config, league_id: Optional[int] = None, time_period_name: Optional[str] = None) -> set:
-        """Get expected seasons for a time period configuration"""
+    def _get_expected_seasons_for_time_period(self, time_period_config, league_id: Optional[int] = None, time_period_name: Optional[str] = None, last_season: Optional[str] = None) -> set:
+        """Get expected seasons for a time period configuration using league's last_season as cutoff"""
         import re
         
         # If we have a specific league_id, use smart pattern recognition
@@ -251,11 +272,40 @@ class FootballDataCollector:
         pattern = time_period_config.pattern
         expected_seasons = set()
         
-        # For 2020s, generate all seasons from 2020 onwards
+        # For 2020s, generate all seasons from 2020 onwards up to the league's last_season
         if pattern == "2020|2020-2021|2021|2021-2022|2022|2022-2023|2023|2023-2024|2024|2024-2025|2025|2025-2026":
-            for year in range(2020, 2027):
+            # Use the league's last_season as the cutoff instead of hardcoded future years
+            if last_season:
+                # Parse last_season to get the year (e.g., "2024-2025" -> 2025)
+                try:
+                    if "-" in last_season:
+                        # Format like "2024-2025"
+                        max_year = int(last_season.split("-")[1])
+                    else:
+                        # Format like "2024"
+                        max_year = int(last_season)
+                    
+                    if self.verbose:
+                        self.log(f"Using last_season '{last_season}' -> max_year: {max_year}", "DEBUG")
+                except ValueError:
+                    # Fallback to current year if parsing fails
+                    from datetime import datetime
+                    max_year = datetime.now().year + 1
+                    if self.verbose:
+                        self.log(f"Failed to parse last_season '{last_season}', using fallback max_year: {max_year}", "WARN")
+            else:
+                # Fallback to current year if no last_season provided
+                from datetime import datetime
+                max_year = datetime.now().year + 1
+                if self.verbose:
+                    self.log(f"No last_season provided, using fallback max_year: {max_year}", "WARN")
+            
+            for year in range(2020, max_year + 1):
                 expected_seasons.add(str(year))
                 expected_seasons.add(f"{year}-{year+1}")
+            
+            if self.verbose:
+                self.log(f"Generated seasons from 2020 to {max_year}: {sorted(expected_seasons)}", "DEBUG")
         # For default_2024, just 2024 and 2024-2025
         elif pattern == "^(2024|2024-2025)$":
             expected_seasons.add("2024")
@@ -312,7 +362,26 @@ class FootballDataCollector:
     
     def collect_league_seasons(self, league_ids: List[int], time_period: Optional[str] = None) -> bool:
         """Collect league seasons data"""
-        self.log(f"Collecting league seasons data for {len(league_ids)} leagues...")
+        # Filter out blacklisted leagues
+        filtered_league_ids = []
+        blacklisted_count = 0
+        
+        for league_id in league_ids:
+            if self.blacklist.is_blacklisted("league-seasons", league_id=league_id):
+                if self.verbose:
+                    self.log(f"League {league_id} is blacklisted for league-seasons endpoint, skipping", "INFO")
+                blacklisted_count += 1
+            else:
+                filtered_league_ids.append(league_id)
+        
+        if blacklisted_count > 0:
+            self.log(f"Skipped {blacklisted_count} blacklisted leagues", "INFO")
+        
+        if not filtered_league_ids:
+            self.log("No leagues to collect after filtering blacklisted endpoints", "INFO")
+            return True
+        
+        self.log(f"Collecting league seasons data for {len(filtered_league_ids)} leagues...")
         if time_period:
             self.log(f"Filtering for time period: {time_period}")
         
@@ -321,10 +390,10 @@ class FootballDataCollector:
             return True
         
         try:
-            self.log(f"Calling load_league_seasons_data with league_ids: {league_ids[:5]}... (showing first 5)", "DEBUG")
+            self.log(f"Calling load_league_seasons_data with league_ids: {filtered_league_ids[:5]}... (showing first 5)", "DEBUG")
             self.log(f"Calling load_league_seasons_data with time_period: {time_period}", "DEBUG")
             success = load_league_seasons_data(
-                league_ids=league_ids,
+                league_ids=filtered_league_ids,
                 time_period=time_period,
                 update_only=False  # Allow new seasons to be added
             )
@@ -336,6 +405,53 @@ class FootballDataCollector:
             return success
         except Exception as e:
             self.log(f"Error collecting league seasons: {e}", "ERROR")
+            return False
+    
+    def collect_league_season_details(self, league_ids: List[int], time_period: Optional[str] = None) -> bool:
+        """Collect league season details data"""
+        # Filter out blacklisted leagues
+        filtered_league_ids = []
+        blacklisted_count = 0
+        
+        for league_id in league_ids:
+            if self.blacklist.is_blacklisted("league-season-details", league_id=league_id):
+                if self.verbose:
+                    self.log(f"League {league_id} is blacklisted for league-season-details endpoint, skipping", "INFO")
+                blacklisted_count += 1
+            else:
+                filtered_league_ids.append(league_id)
+        
+        if blacklisted_count > 0:
+            self.log(f"Skipped {blacklisted_count} blacklisted leagues", "INFO")
+        
+        if not filtered_league_ids:
+            self.log("No leagues to collect after filtering blacklisted endpoints", "INFO")
+            return True
+        
+        self.log(f"Collecting league season details data for {len(filtered_league_ids)} leagues...")
+        if time_period:
+            self.log(f"Filtering for time period: {time_period}")
+        
+        if self.dry_run:
+            self.log("DRY RUN: Would collect league season details data", "INFO")
+            return True
+        
+        try:
+            self.log(f"Calling load_league_season_details_data with league_ids: {filtered_league_ids[:5]}... (showing first 5)", "DEBUG")
+            self.log(f"Calling load_league_season_details_data with time_period: {time_period}", "DEBUG")
+            success = load_league_season_details_data(
+                league_ids=filtered_league_ids,
+                time_period=time_period,
+                update_only=False  # Allow new details to be added
+            )
+            self.log(f"load_league_season_details_data returned: {success}", "DEBUG")
+            if success:
+                self.log("League season details data collection completed", "INFO")
+            else:
+                self.log("League season details data collection failed", "ERROR")
+            return success
+        except Exception as e:
+            self.log(f"Error collecting league season details: {e}", "ERROR")
             return False
     
     def get_league_ids_for_countries(self, country_codes: List[str]) -> List[int]:
@@ -429,8 +545,14 @@ class FootballDataCollector:
                     self.log("No leagues need season updates", "INFO")
             else:
                 self.log("League seasons are fresh for time period, skipping collection", "INFO")
+            
+            # Step 4: Collect league season details (COMMENTED OUT - Many APIs broken)
+            # self.log("Collecting league season details...")
+            # if not self.collect_league_season_details(league_ids, scope_time_period):
+            #     self.log("Failed to collect league season details data", "ERROR")
+            #     return False
         else:
-            self.log("No leagues found for countries, skipping league seasons", "WARN")
+            self.log("No leagues found for countries, skipping league seasons and details", "WARN")
         
         self.log(f"Collection for scope '{scope_name}' completed successfully!", "INFO")
         return True
@@ -473,8 +595,14 @@ class FootballDataCollector:
                     return False
             else:
                 self.log("League seasons are fresh for time period, skipping collection", "INFO")
+            
+            # Step 4: Collect league season details (COMMENTED OUT - Many APIs broken)
+            # self.log("Collecting league season details...")
+            # if not self.collect_league_season_details(league_ids, time_period):
+            #     self.log("Failed to collect league season details data", "ERROR")
+            #     return False
         else:
-            self.log("No leagues found for countries, skipping league seasons", "WARN")
+            self.log("No leagues found for countries, skipping league seasons and details", "WARN")
         
         self.log(f"Collection for custom countries completed successfully!", "INFO")
         return True
@@ -488,8 +616,15 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Test without making changes")
     parser.add_argument("--force", action="store_true", help="Force refresh ignoring freshness checks")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--show-blacklist", action="store_true", help="Show blacklisted endpoints and exit")
     
     args = parser.parse_args()
+    
+    # Handle blacklist summary
+    if args.show_blacklist:
+        blacklist = load_endpoint_blacklist()
+        blacklist.print_blacklist_summary()
+        return 0
     
     if not args.scope and not args.countries:
         parser.error("Must specify either --scope or --countries")

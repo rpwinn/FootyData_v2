@@ -96,6 +96,57 @@ fact.team_schedules      -- Team fixture facts
 - **Leagues**: All leagues from `/leagues` endpoint (by country) ✅
 - **League Seasons**: 1,740 seasons from 107 leagues via `/league-seasons` endpoint ✅
 
+### 🏗️ **Nested JSON Handling**
+
+The FBR API often returns nested JSON structures that require proper normalization into separate staging tables:
+
+#### **Example: `/teams` Endpoint**
+```json
+{
+  "team_roster": {
+    "data": [
+      {
+        "player": "Rodri",
+        "player_id": "6434f10d",
+        "nationality": "ESP",
+        "position": "MF",
+        "age": 27,
+        "mp": 34,
+        "starts": 34
+      }
+    ]
+  },
+  "team_schedule": {
+    "data": [
+      {
+        "date": "2023-08-06",
+        "match_id": "10e5c045",
+        "league_name": "Community Shield",
+        "league_id": 602,
+        "opponent": "Arsenal",
+        "result": "D",
+        "gf": 1,
+        "ga": 1
+      }
+    ]
+  }
+}
+```
+
+**Solution**: Create separate staging tables:
+- `staging.team_rosters` - For player roster data
+- `staging.team_schedules` - For match schedule data
+
+#### **Design Pattern**
+When encountering nested JSON structures:
+1. **Identify distinct data entities** within the response
+2. **Create separate staging tables** for each entity type
+3. **Maintain referential integrity** through shared keys (e.g., `team_id`)
+4. **Preserve raw data** in JSONB columns for debugging
+5. **Document the relationship** between the tables
+
+This pattern ensures proper normalization while maintaining data integrity and debugging capabilities.
+
 #### **Collection Statistics**
 - **Countries**: 195 countries collected
 - **Leagues**: 1,234 league entries (including international competitions across multiple countries)

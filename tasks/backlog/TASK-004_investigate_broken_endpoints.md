@@ -3,21 +3,22 @@
 ## Task Overview
 - **Task ID**: TASK-004
 - **Created**: 2025-07-31
-- **Status**: TODO
+- **Status**: COMPLETED
 - **Priority**: MEDIUM
 - **Type**: INVESTIGATION
 - **Dependencies**: TASK-003 (Cascading Data Collection Framework)
+- **Completed**: 2025-07-31
 
 ## 🎯 Objective
 Investigate and implement a system to track broken endpoints to avoid re-running them on every collection run. Currently, endpoints that return 500 errors (like league 602 - FA Community Shield) are retried on every run, which is inefficient and wastes API calls.
 
 ## 📋 Acceptance Criteria
-- [ ] Identify all endpoints that consistently return 500 errors
-- [ ] Create a mechanism to track and store failed endpoint attempts
-- [ ] Implement logic to skip known broken endpoints in future runs
-- [ ] Add configuration options for endpoint blacklisting
-- [ ] Create reporting system to show which endpoints are being skipped
-- [ ] Provide manual override to retry blacklisted endpoints
+- [x] Identify all endpoints that consistently return 500 errors
+- [x] Create a mechanism to track and store failed endpoint attempts
+- [x] Implement logic to skip known broken endpoints in future runs
+- [x] Add configuration options for endpoint blacklisting
+- [x] Create reporting system to show which endpoints are being skipped
+- [x] Provide manual override to retry blacklisted endpoints
 
 ## 🔍 Context
 During the European majors collection, we encountered several endpoints that consistently return 500 errors:
@@ -112,6 +113,76 @@ endpoint_blacklist:
 - **Configuration Management**: Keeping blacklist up to date
 - **Testing**: Ensuring blacklist doesn't hide real issues
 
+## ✅ Completion Summary
+
+### Files Created/Modified:
+- **`src/utils/endpoint_blacklist.py`** - Flexible blacklist utility with multi-parameter support
+- **`config/collection_config.yaml`** - Blacklist configuration with examples
+- **`src/etl/collect_football_data.py`** - Integrated blacklist checking into collection orchestrator
+
+### Results Achieved:
+- **✅ Dramatically reduced API calls** - From 7 leagues needing updates to only 2 (5 broken leagues skipped)
+- **✅ Flexible parameter support** - Can blacklist by league_id, season_id, team_id, player_id, etc.
+- **✅ Future-proof design** - Easy to add new endpoints and parameter types
+- **✅ Clear reporting** - `--show-blacklist` command shows current blacklist status
+- **✅ Backward compatible** - No breaking changes to existing functionality
+
+### Current Blacklist:
+- **League 602** (FA Community Shield) - 500 Server Error
+- **League 604** - 500 Server Error  
+- **League 606** - 500 Server Error
+- **League 612** - 500 Server Error
+- **League 646** - 500 Server Error
+
+## 🔧 How to Use Blacklist for Future Endpoints
+
+### 1. **Identify Broken Endpoints**
+When you encounter 500 errors or other consistent failures:
+```bash
+# Run collection and look for errors
+python3 src/etl/collect_football_data.py --scope your_scope --verbose
+```
+
+### 2. **Add to Blacklist Configuration**
+Edit `config/collection_config.yaml`:
+```yaml
+endpoint_blacklist:
+  enabled: true
+  permanent_failures:
+    # Existing broken leagues
+    - endpoint: "league-seasons"
+      league_ids: [602, 604, 606, 612, 646]
+      reason: "One-off competitions don't support seasons endpoint"
+    
+    # New broken endpoint (add when discovered)
+    - endpoint: "league-standings"
+      league_ids: [999]
+      season_ids: ["2023-2024"]
+      reason: "Standings not available for this league/season"
+```
+
+### 3. **Supported Parameter Types**
+The blacklist supports these parameter types:
+- **`league_ids`** - Blacklist specific leagues
+- **`season_ids`** - Blacklist specific seasons  
+- **`team_ids`** - Blacklist specific teams
+- **`player_ids`** - Blacklist specific players
+
+### 4. **Check Blacklist Status**
+```bash
+# View current blacklist
+python3 src/etl/collect_football_data.py --show-blacklist
+
+# Test collection with blacklist
+python3 src/etl/collect_football_data.py --scope your_scope --dry-run --verbose
+```
+
+### 5. **Integration Points**
+The blacklist is automatically checked in:
+- **Freshness checks** - Skips blacklisted endpoints during freshness validation
+- **Collection filtering** - Filters out blacklisted items before API calls
+- **Logging** - Shows which items are being skipped
+
 ## 💡 Future Enhancements
 - **Automatic Retry**: Periodically retry blacklisted endpoints
 - **API Health Dashboard**: Monitor endpoint success rates
@@ -122,8 +193,9 @@ endpoint_blacklist:
 - [Current API Documentation](src/api/endpoint_documentation/)
 - [Collection Configuration](config/collection_config.yaml)
 - [FBR Client Implementation](src/api/fbr_client.py)
+- [Blacklist Utility](src/utils/endpoint_blacklist.py)
 
 ---
 *Created: 2025-07-31*
 *Last Updated: 2025-07-31*
-*Status: TODO* 
+*Status: COMPLETED* 
