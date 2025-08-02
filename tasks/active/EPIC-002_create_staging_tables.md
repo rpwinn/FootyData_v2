@@ -28,7 +28,7 @@ We now have comprehensive API documentation for all 15 FBR endpoints. We need to
 - [x] **Leagues** - `/leagues` endpoint and staging table ✅
 - [ ] **League Seasons** - `/league-seasons` endpoint and staging table
 - [ ] **League Season Details** - `/league-season-details` endpoint and staging table
-- [ ] **League Standings** - `/league-standings` endpoint and staging table
+- [x] **League Standings** - `/league-standings` endpoint and staging table ✅ (BLOCKED - API Broken)
 - [ ] **Teams** - `/teams` endpoint and staging table
 - [ ] **Players** - `/players` endpoint and staging table
 - [ ] **Matches** - `/matches` endpoint and staging table

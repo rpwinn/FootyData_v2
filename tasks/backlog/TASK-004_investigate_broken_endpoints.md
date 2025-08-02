@@ -134,6 +134,25 @@ endpoint_blacklist:
 - **League 612** - 500 Server Error
 - **League 646** - 500 Server Error
 
+### League Standings Endpoint Investigation:
+**Pattern Discovered**: The `/league-standings` endpoint works for international competitions but fails for club competitions.
+
+**Working League IDs** (International Competitions):
+- **League 1** (World Cup) - ✅ Works with seasons 2014, 2018, 2022
+- **League 3** (CONCACAF Nations League) - ✅ Works
+- **League 5** (OFC Nations Cup) - ✅ Works  
+- **League 7** (AFC Asian Cup Qualifiers) - ✅ Works
+
+**Failing League IDs** (Club Competitions):
+- **League 2** - ❌ 500 Server Error
+- **League 4** - ❌ 500 Server Error
+- **League 6** - ❌ 500 Server Error
+- **League 8** (Champions League) - ❌ 500 Server Error
+- **League 9** (Premier League) - ❌ 500 Server Error
+- **League 10** - ❌ 500 Server Error
+
+**Conclusion**: Club competitions appear to be broken for the `/league-standings` endpoint, while international competitions work correctly.
+
 ## 🔧 How to Use Blacklist for Future Endpoints
 
 ### 1. **Identify Broken Endpoints**

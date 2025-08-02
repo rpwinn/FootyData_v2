@@ -101,49 +101,95 @@ fact.team_schedules      -- Team fixture facts
 The FBR API often returns nested JSON structures that require proper normalization into separate staging tables:
 
 #### **Example: `/teams` Endpoint**
-```json
-{
-  "team_roster": {
-    "data": [
-      {
-        "player": "Rodri",
-        "player_id": "6434f10d",
-        "nationality": "ESP",
-        "position": "MF",
-        "age": 27,
-        "mp": 34,
-        "starts": 34
-      }
-    ]
-  },
-  "team_schedule": {
-    "data": [
-      {
-        "date": "2023-08-06",
-        "match_id": "10e5c045",
-        "league_name": "Community Shield",
-        "league_id": 602,
-        "opponent": "Arsenal",
-        "result": "D",
-        "gf": 1,
-        "ga": 1
-      }
-    ]
-  }
-}
-```
+        ```json
+        {
+          "team_roster": {
+            "data": [
+              {
+                "player": "Rodri",
+                "player_id": "6434f10d",
+                "nationality": "ESP",
+                "position": "MF",
+                "age": 27,
+                "mp": 34,
+                "starts": 34
+              }
+            ]
+          },
+          "team_schedule": {
+            "data": [
+              {
+                "date": "2023-08-06",
+                "match_id": "10e5c045",
+                "league_name": "Community Shield",
+                "league_id": 602,
+                "opponent": "Arsenal",
+                "result": "D",
+                "gf": 1,
+                "ga": 1
+              }
+            ]
+          }
+        }
+        ```
 
-**Solution**: Create separate staging tables:
-- `staging.team_rosters` - For player roster data
-- `staging.team_schedules` - For match schedule data
+        **Solution**: Create separate staging tables:
+        - `staging.team_rosters` - For player roster data
+        - `staging.team_schedules` - For match schedule data
+
+#### **Example: `/matches` Endpoint**
+        The matches endpoint has **two distinct response formats** based on parameters:
+
+        **League Matches (no team_id)**:
+        ```json
+        {
+          "data": [
+            {
+              "match_id": "089c98e2",
+              "date": "2022-07-30",
+              "home": "Wycombe",
+              "home_team_id": "43c2583e",
+              "away": "Burton Albion",
+              "away_team_id": "b09787c5",
+              "venue": "Adams Park",
+              "attendance": "5,772"
+            }
+          ]
+        }
+        ```
+
+        **Team Matches (with team_id)**:
+        ```json
+        {
+          "data": [
+            {
+              "match_id": "09d8a999",
+              "date": "2022-08-06",
+              "home_away": "Home",
+              "opponent": "Southampton",
+              "opponent_id": "33c895d4",
+              "result": "W",
+              "gf": 4,
+              "ga": 1,
+              "formation": "3-4-3",
+              "captain": "Hugo Lloris"
+            }
+          ]
+        }
+        ```
+
+        **Solution**: Create separate staging tables:
+        - `staging.league_matches` - For league-wide match data
+        - `staging.team_matches` - For team-specific match data
 
 #### **Design Pattern**
-When encountering nested JSON structures:
-1. **Identify distinct data entities** within the response
-2. **Create separate staging tables** for each entity type
-3. **Maintain referential integrity** through shared keys (e.g., `team_id`)
-4. **Preserve raw data** in JSONB columns for debugging
-5. **Document the relationship** between the tables
+        When encountering nested JSON structures or parameter-based response formats:
+        1. **Identify distinct data entities** within the response
+        2. **Create separate staging tables** for each entity type
+        3. **Maintain referential integrity** through shared keys (e.g., `team_id`, `match_id`)
+        4. **Preserve raw data** in JSONB columns for debugging
+        5. **Document the relationship** between the tables
+        6. **Handle parameter-based responses** by creating separate tables for different API call patterns
 
 This pattern ensures proper normalization while maintaining data integrity and debugging capabilities.
 

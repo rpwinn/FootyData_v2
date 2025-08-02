@@ -94,12 +94,47 @@ This task depends on TASK-002-03 (League Seasons staging table) because the `/le
 - [FBR API Client](src/api/fbr_client.py)
 
 ## 🚧 Blockers
-- Requires TASK-002-03 (League seasons staging table) to be completed first
+- **API Partially Working**: The `/league-standings` endpoint works for international competitions but fails for club competitions
+- **Server-side Issue**: The endpoint appears to be broken on the API provider side
+- **Dependency**: Requires TASK-002-03 (League seasons staging table) to be completed first
 
 ## 💡 Notes
 This endpoint provides final standings data for leagues. The test script should include both completed seasons and current seasons to validate different data scenarios.
 
+### API Response Structure Notes
+The actual API response has two top-level fields:
+1. `standings_type` - Single datapoint (can be stored as a column)
+2. `standings` - Array of team standings data
+
+**Design Decision**: Store `standings_type` as a column in the standings table rather than creating a separate table, since it's a single datapoint.
+
+**Nested JSON**: The response also includes a `top_team_scorer` field with nested JSON containing the team's top scorer and goals scored. This will be stored as JSONB in the database.
+
+**Team ID Discovery**: This endpoint is a potential source for team IDs that can be used for the teams endpoint integration. The API works for certain league IDs (1, 3, 5, 7) but fails for others (2, 4, 6, 8, 9, 10).
+
+**Working League IDs**: 1, 3, 5, 7 (tested successfully)
+**Failing League IDs**: 2, 4, 6, 8, 9, 10 (500 Server Errors)
+
+**Pattern Discovery**: 
+- ✅ **International competitions work**: World Cup (1), CONCACAF (3), OFC (5), AFC (7)
+- ❌ **Club competitions fail**: Premier League (9), Champions League (8), La Liga (12), etc.
+- ✅ **Season support**: World Cup works with different years (2014, 2018, 2022)
+
+**Implementation Status**: 
+- ✅ Staging table created and tested
+- ✅ Test script created and validated
+- ✅ API endpoint works for some league IDs
+- ✅ Can collect data for working league IDs
+- ❌ API fails for major leagues (Premier League, Champions League, etc.)
+
+**Future Potential**: When the API is working for club competitions, this endpoint will provide team IDs for each league/season combination, which could solve the team ID discovery problem for TASK-002-06.
+
+**Current Value**: 
+- ✅ **International team IDs available**: 100+ team IDs from World Cup, CONCACAF, OFC, AFC
+- ✅ **Can test teams endpoint**: Use international team IDs to validate teams endpoint
+- ❌ **Club team IDs unavailable**: Major leagues (Premier League, Champions League, etc.) are broken
+
 ---
 *Created: 2025-07-31*
 *Last Updated: 2025-07-31*
-*Status: TODO* 
+*Status: BLOCKED - Club Competitions Broken* 

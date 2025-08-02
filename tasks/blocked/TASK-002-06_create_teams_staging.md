@@ -102,7 +102,7 @@ This task is independent and can be completed without waiting for other tasks. T
 - [FBR API Client](src/api/fbr_client.py)
 
 ## 🚧 Blockers
-- **Team ID Discovery**: No way to get team IDs for a league/season combination
+- **Team ID Discovery**: Can get team IDs from working league standings (league IDs 1, 3, 5, 7)
 - **Integration Dependency**: Cannot integrate into football collector without team ID discovery mechanism
 - **API Limitation**: `/teams` endpoint requires individual `team_id` - no bulk team listing available
 
@@ -112,7 +112,7 @@ This endpoint provides comprehensive team data including roster and schedule inf
 ---
 *Created: 2025-07-31*
 *Last Updated: 2025-07-31*
-*Status: BLOCKED*
+*Status: BLOCKED - Team ID Discovery Required*
 
 ## ⚠️ Important Note
 
@@ -143,7 +143,7 @@ The `/teams` endpoint has shown intermittent 500 Server Errors during testing. W
 - ❌ **Cannot integrate into cascading collection framework**
 
 **Required Solution**:
-- Need to find or create a way to get team IDs for a league
-- Could be from other endpoints (`/matches`, `/league-standings`)
-- Or test if `get_teams_by_league()` method actually works
-- Or create manual team ID lists for major leagues 
+- ✅ **Found team ID source**: League standings endpoint (league IDs 1, 3, 5, 7)
+- ✅ **32 team IDs available** from League 1 (World Cup) alone
+- ✅ **Ready to test teams endpoint** with discovered team IDs
+- Could also explore other endpoints (`/matches`, `/league-standings`) for more team IDs 

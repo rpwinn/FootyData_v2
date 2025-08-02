@@ -3,7 +3,7 @@
 ## Task Overview
 - **Task ID**: TASK-002-04
 - **Created**: 2025-07-31
-- **Status**: TODO
+- **Status**: BLOCKED
 - **Priority**: HIGH
 - **Epic**: EPIC-002 (Create Staging Tables for API Data)
 - **Dependencies**: TASK-002-03 (League Seasons staging table)

@@ -86,6 +86,38 @@ def check_api_health():
             print(f"⏱️ Response time: {end_time - start_time:.2f} seconds")
             results['league_seasons'] = {'status': 'working', 'response_time': end_time - start_time}
         
+        # Test 4: League matches endpoint (without team_id)
+        print("\n📡 Testing league matches endpoint (League 9, Season 2024-2025)...")
+        start_time = time.time()
+        league_matches_response = client.get_matches("9", "2024-2025")
+        end_time = time.time()
+        
+        if "error" in league_matches_response:
+            print(f"❌ League matches API failed: {league_matches_response['error']}")
+            results['league_matches'] = {'status': 'failed', 'error': league_matches_response['error']}
+            overall_healthy = False
+        else:
+            match_count = len(league_matches_response.get('data', []))
+            print(f"✅ League matches API working: {match_count} matches")
+            print(f"⏱️ Response time: {end_time - start_time:.2f} seconds")
+            results['league_matches'] = {'status': 'working', 'response_time': end_time - start_time}
+        
+        # Test 5: Team matches endpoint (with team_id)
+        print("\n📡 Testing team matches endpoint (League 9, Season 2024-2025, Team 18bb7c10)...")
+        start_time = time.time()
+        team_matches_response = client.get_matches("9", "2024-2025", "18bb7c10")
+        end_time = time.time()
+        
+        if "error" in team_matches_response:
+            print(f"❌ Team matches API failed: {team_matches_response['error']}")
+            results['team_matches'] = {'status': 'failed', 'error': team_matches_response['error']}
+            overall_healthy = False
+        else:
+            match_count = len(team_matches_response.get('data', []))
+            print(f"✅ Team matches API working: {match_count} matches")
+            print(f"⏱️ Response time: {end_time - start_time:.2f} seconds")
+            results['team_matches'] = {'status': 'working', 'response_time': end_time - start_time}
+        
         # Summary
         print(f"\n📊 API Health Summary:")
         print("=" * 30)

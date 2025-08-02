@@ -23,6 +23,8 @@ from etl.load_countries_data import load_countries_data
 from etl.load_leagues_data import load_leagues_data
 from etl.load_league_seasons_data import load_league_seasons_data
 from etl.load_league_season_details_data import load_league_season_details_data
+from etl.load_league_matches_data import load_league_matches_data
+from etl.load_team_matches_data import load_team_matches_data
 
 class FootballDataCollector:
     """Master orchestrator for football data collection"""
@@ -454,6 +456,100 @@ class FootballDataCollector:
             self.log(f"Error collecting league season details: {e}", "ERROR")
             return False
     
+    def collect_league_matches(self, league_ids: List[int], time_period: Optional[str] = None) -> bool:
+        """Collect league matches data (fixtures/schedules)"""
+        # Filter out blacklisted leagues
+        filtered_league_ids = []
+        blacklisted_count = 0
+        
+        for league_id in league_ids:
+            if self.blacklist.is_blacklisted("matches", league_id=league_id):
+                if self.verbose:
+                    self.log(f"League {league_id} is blacklisted for matches endpoint, skipping", "INFO")
+                blacklisted_count += 1
+            else:
+                filtered_league_ids.append(league_id)
+        
+        if blacklisted_count > 0:
+            self.log(f"Skipped {blacklisted_count} blacklisted leagues", "INFO")
+        
+        if not filtered_league_ids:
+            self.log("No leagues to collect after filtering blacklisted endpoints", "INFO")
+            return True
+        
+        self.log(f"Collecting league matches data for {len(filtered_league_ids)} leagues...")
+        if time_period:
+            self.log(f"Filtering for time period: {time_period}")
+        
+        if self.dry_run:
+            self.log("DRY RUN: Would collect league matches data", "INFO")
+            return True
+        
+        try:
+            self.log(f"Calling load_league_matches_data with league_ids: {filtered_league_ids[:5]}... (showing first 5)", "DEBUG")
+            self.log(f"Calling load_league_matches_data with time_period: {time_period}", "DEBUG")
+            success = load_league_matches_data(
+                league_ids=filtered_league_ids,
+                time_period=time_period,
+                update_only=False  # Allow new matches to be added
+            )
+            self.log(f"load_league_matches_data returned: {success}", "DEBUG")
+            if success:
+                self.log("League matches data collection completed", "INFO")
+            else:
+                self.log("League matches data collection failed", "ERROR")
+            return success
+        except Exception as e:
+            self.log(f"Error collecting league matches: {e}", "ERROR")
+            return False
+    
+    def collect_team_matches(self, league_ids: List[int], time_period: Optional[str] = None) -> bool:
+        """Collect team matches data (actual results with scores)"""
+        # Filter out blacklisted leagues
+        filtered_league_ids = []
+        blacklisted_count = 0
+        
+        for league_id in league_ids:
+            if self.blacklist.is_blacklisted("matches", league_id=league_id):
+                if self.verbose:
+                    self.log(f"League {league_id} is blacklisted for matches endpoint, skipping", "INFO")
+                blacklisted_count += 1
+            else:
+                filtered_league_ids.append(league_id)
+        
+        if blacklisted_count > 0:
+            self.log(f"Skipped {blacklisted_count} blacklisted leagues", "INFO")
+        
+        if not filtered_league_ids:
+            self.log("No leagues to collect after filtering blacklisted endpoints", "INFO")
+            return True
+        
+        self.log(f"Collecting team matches data for {len(filtered_league_ids)} leagues...")
+        if time_period:
+            self.log(f"Filtering for time period: {time_period}")
+        
+        if self.dry_run:
+            self.log("DRY RUN: Would collect team matches data", "INFO")
+            return True
+        
+        try:
+            self.log(f"Calling load_team_matches_data with league_ids: {filtered_league_ids[:5]}... (showing first 5)", "DEBUG")
+            self.log(f"Calling load_team_matches_data with time_period: {time_period}", "DEBUG")
+            success = load_team_matches_data(
+                league_ids=filtered_league_ids,
+                time_period=time_period,
+                update_only=False  # Allow new matches to be added
+            )
+            self.log(f"load_team_matches_data returned: {success}", "DEBUG")
+            if success:
+                self.log("Team matches data collection completed", "INFO")
+            else:
+                self.log("Team matches data collection failed", "ERROR")
+            return success
+        except Exception as e:
+            self.log(f"Error collecting team matches: {e}", "ERROR")
+            return False
+    
     def get_league_ids_for_countries(self, country_codes: List[str]) -> List[int]:
         """Get league IDs for specified countries"""
         try:
@@ -471,6 +567,26 @@ class FootballDataCollector:
                     return [row[0] for row in cur.fetchall()]
         except Exception as e:
             self.log(f"Error getting league IDs: {e}", "ERROR")
+            return []
+    
+    def filter_league_ids_by_names(self, league_ids: List[int], league_names: List[str]) -> List[int]:
+        """Filter league IDs by league names"""
+        try:
+            with psycopg2.connect(self.database_url) as conn:
+                with conn.cursor() as cur:
+                    placeholders = ','.join(['%s'] * len(league_ids))
+                    name_placeholders = ','.join(['%s'] * len(league_names))
+                    cur.execute(f"""
+                        SELECT league_id 
+                        FROM staging.leagues 
+                        WHERE league_id IN ({placeholders})
+                        AND competition_name IN ({name_placeholders})
+                        ORDER BY league_id
+                    """, league_ids + league_names)
+                    
+                    return [row[0] for row in cur.fetchall()]
+        except Exception as e:
+            self.log(f"Error filtering league IDs by names: {e}", "ERROR")
             return []
     
     def collect_scope(self, scope_name: str, time_period: Optional[str] = None, force_refresh: bool = False) -> bool:
@@ -514,6 +630,16 @@ class FootballDataCollector:
         # Step 3: Check and collect league seasons
         league_ids = self.get_league_ids_for_countries(scope.countries)
         
+        # Filter by specific leagues if defined in scope
+        if scope.leagues:
+            self.log(f"Filtering leagues by scope: {', '.join(scope.leagues)}")
+            filtered_league_ids = self.filter_league_ids_by_names(league_ids, scope.leagues)
+            if filtered_league_ids:
+                league_ids = filtered_league_ids
+                self.log(f"Filtered to {len(league_ids)} leagues: {league_ids}")
+            else:
+                self.log(f"No leagues found matching scope filter: {', '.join(scope.leagues)}", "WARN")
+        
         if league_ids:
             # Use scope's time period if available, otherwise use CLI argument
             # For scopes, we need to find the time period name from the pattern
@@ -551,6 +677,18 @@ class FootballDataCollector:
             # if not self.collect_league_season_details(league_ids, scope_time_period):
             #     self.log("Failed to collect league season details data", "ERROR")
             #     return False
+            
+            # Step 5: Collect league matches (fixtures/schedules)
+            self.log("Collecting league matches...")
+            if not self.collect_league_matches(league_ids, scope_time_period):
+                self.log("Failed to collect league matches data", "ERROR")
+                return False
+            
+            # Step 6: Collect team matches (actual results with scores)
+            self.log("Collecting team matches...")
+            if not self.collect_team_matches(league_ids, scope_time_period):
+                self.log("Failed to collect team matches data", "ERROR")
+                return False
         else:
             self.log("No leagues found for countries, skipping league seasons and details", "WARN")
         
@@ -601,6 +739,18 @@ class FootballDataCollector:
             # if not self.collect_league_season_details(league_ids, time_period):
             #     self.log("Failed to collect league season details data", "ERROR")
             #     return False
+            
+            # Step 5: Collect league matches (fixtures/schedules)
+            self.log("Collecting league matches...")
+            if not self.collect_league_matches(league_ids, time_period):
+                self.log("Failed to collect league matches data", "ERROR")
+                return False
+            
+            # Step 6: Collect team matches (actual results with scores)
+            self.log("Collecting team matches...")
+            if not self.collect_team_matches(league_ids, time_period):
+                self.log("Failed to collect team matches data", "ERROR")
+                return False
         else:
             self.log("No leagues found for countries, skipping league seasons and details", "WARN")
         
